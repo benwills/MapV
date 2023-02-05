@@ -141,15 +141,15 @@ typedef struct Mapv_Meta_st {
   uint64_t tblBytes;        // after "alignment"
   uint64_t tblBytesReal;    // before "alignment"
 
-  uint64_t bktsCnt;         // buckets have 4,8 slots for entries
-  uint64_t bktsCntReal;     // buckets have 4,8 slots for entries
+  uint64_t bktsCnt;         // buckets have 4 slots for entries
+  uint64_t bktsCntReal;     // buckets have 4 slots for entries
   uint64_t slotHashShift;   // pre-calc; for finding our bucket index
 
   uint64_t entriesCap;      // number of slots in the table
   uint64_t entriesCapReal;  // including extra final buckets
   uint64_t entriesUsed;     // # values in the table
   uint64_t entriesAvail;    // # of slots open
-  double   entriesCapPct;   // tblSlotCap / tblSlotsUsed
+  double   entriesCapPct;   // tblSlotsUsed / tblSlotCap
 
   // distances: aka: probe sequence length
   // note that a distance of 1, is actualy two slots/buckets
@@ -161,7 +161,7 @@ typedef struct Mapv_Meta_st {
 } Mapv_Meta_st;
 
 typedef struct Mapv_Tbl_st {
-  Mapv_Bkt_st* bktPtrReal; // ptr to free. alloc extra for alignment
+  Mapv_Bkt_st* bktPtrReal; // ptr to free(). alloc extra for alignment
   Mapv_Bkt_st* bkt;
 } Mapv_Tbl_st;
 
@@ -952,4 +952,3 @@ int main()
     printf("count and boolCount do not match!!!\n");
   }
 }
-
