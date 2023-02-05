@@ -18,20 +18,32 @@
 
 //
 // @TODO:
-//        - deletes
-//        - configuration
-//          - hash function; allow for testing faster+lower-quality if wanted
-//        - error states vs printing errors
-//        - check data types. lots of u64 used when may not be needed
-//        - variants
-//          - 16/32-bit data stored (eg: array ids, types, etc)
-//            - would require 2x/4x bucket size for 32-byte alignment
-//          - 64-bit: save keys and compare vs 128-bit probabilistic
-//          - avx512
-//            - 256-bit hashes?
-//          - static tables
-//            - post-hash optimizer for compaction
-//            - would require table sizes != power of 2
+//      - deletes
+//      - configuration
+//        - hash function; allow for testing faster+lower-quality if wanted
+//      - error states vs printing errors
+//      - check data types. lots of u64 used when may not be needed
+//      - variants
+//        - 16/32-bit data stored (eg: array ids, types, etc)
+//          - would require 2x/4x bucket size for 32-byte alignment
+//        - 64-bit: save keys and compare vs 128-bit probabilistic
+//        - avx512
+//          - 256-bit hashes?
+//        - static tables
+//          - post-hash optimizer for compaction
+//          - would require table sizes != power of 2
+//
+
+//
+// @DOCUMENTATION / readme
+//      - probabilistic nature of 128-bit keys and dropping original keys
+//        - benefits : memory access
+//        - downsides: possible faslse positives
+//      - slot shift from top of hash means rebuilding table maintains order
+//        - ie: early-loaded keys are found faster, regardless of rebuilds
+//      - bucket structure = cache locality
+//        - 8 byte values stored
+//      - configuration options
 //
 
 //
