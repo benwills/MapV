@@ -164,7 +164,6 @@ typedef struct Mapv_Tbl_st {
   Mapv_Bkt_st* bkt;
 } Mapv_Tbl_st;
 
-
 typedef struct Mapv_st {
   Mapv_Cfg_st  cfg;
   Mapv_Meta_st meta;
@@ -174,9 +173,7 @@ typedef struct Mapv_st {
 
 
 
-
 //------------------------------------------------------------------------------
-
 void
 Mapv_PrintTableCfg(const Mapv_st* map);
 
@@ -266,8 +263,6 @@ Mapv_Find(const Mapv_st* map,
 
 
 
-
-
 //==============================================================================
 //
 // print
@@ -329,6 +324,12 @@ Print_Hv(Mapv_HV_st hv) {
   fflush(stdout);
 }
 
+
+//==============================================================================
+//
+// _pow2...()
+//
+//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 static inline uint64_t
@@ -767,8 +768,8 @@ Mapv_Find(const Mapv_st* map,
   for (int iter = 0; iter < maxIters; iter++)
   {
     // `| 0x100` is to set a highest bit as an indicator that nothing was found
-    // if no matches were found found, idxFoundHi/Lo will == 8.
-    // could also set to 0x10 and check idxFound is 4.
+    // if no matches were found found, idxHi/Lo will == 8.
+    // could also set to 0x10 and check idx is 4.
     // but that's less clear, given we're working with 4 array indexes.
 
     const Mapv_BktId_t  bktId     = slotId / MAPV_BKT_SLOTS;
@@ -776,17 +777,17 @@ Mapv_Find(const Mapv_st* map,
 
     haystack = _mm256_load_si256((__m256i*)map->tbl.bkt[bktId].slotsHi);
     found    = _mm256_cmpeq_epi64(haystack, needleHi);
-    const int idxFoundHi = __builtin_ctz(_mm256_movemask_pd((__m256d)found) | 0x100);
-    if (idxFoundHi == 8) { // not found
+    const int idxHi = __builtin_ctz(_mm256_movemask_pd((__m256d)found) | 0x100);
+    if (idxHi == 8) { // not found
       slotId += MAPV_BKT_SLOTS;
       continue;
     }
 
     haystack = _mm256_load_si256((__m256i*)map->tbl.bkt[bktId].slotsLo);
     found    = _mm256_cmpeq_epi64(haystack, needleLo);
-    const int idxFoundLo = __builtin_ctz(_mm256_movemask_pd((__m256d)found) | 0x100);
-    if (idxFoundHi == idxFoundLo) {
-      *val = map->tbl.bkt[bktId].vals[idxFoundLo];
+    const int idxLo = __builtin_ctz(_mm256_movemask_pd((__m256d)found) | 0x100);
+    if (idxHi == idxLo) {
+      *val = map->tbl.bkt[bktId].vals[idxLo];
       return true;
     }
 
@@ -803,9 +804,12 @@ Mapv_Find(const Mapv_st* map,
 //==============================================================================
 //==============================================================================
 //==============================================================================
-const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00000--google-10000-english.txt";
-// const char* INPUT_FILE = "/home/o/Desktop/xub-root/media/src/c/hashing/hsh.key/_in/00887--urls.12MM.txt";
-
+//
+// everything below here is for testing
+//
+//------------------------------------------------------------------------------
+// const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00000--google-10000-english.txt";
+const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00887--urls.12MM.txt";
 
 //------------------------------------------------------------------------------
 char**
