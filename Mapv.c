@@ -17,6 +17,24 @@
                  __FILE__, __FUNCTION__, __LINE__);fflush(stdout);}
 
 //
+// @TODO:
+//        - deletes
+//        - configuration
+//          - hash function; allow for testing faster+lower-quality if wanted
+//        - error states vs printing errors
+//        - check data types. lots of u64 used when may not be needed
+//        - variants
+//          - 16/32-bit data stored (eg: array ids, types, etc)
+//            - would require 2x/4x bucket size for 32-byte alignment
+//          - 64-bit: save keys and compare vs 128-bit probabilistic
+//          - avx512
+//            - 256-bit hashes?
+//          - static tables
+//            - post-hash optimizer for compaction
+//            - would require table sizes != power of 2
+//
+
+//
 // @NOTES: this is technically a probabilistic data structure, as the original
 //         key is not compared. this is "okay" because 128 bits of a very high
 //         quality hash is used for key lookups. there are multiple benefits:
@@ -36,7 +54,7 @@
 //
 
 //
-// @NOTE for my future self:
+// @NOTE on SIMD for my future self:
 //
 // apparently an equality comparison of certain floating point double values,
 // even though the bits are exactly the same, does not always return true with
@@ -274,7 +292,7 @@ void
 Mapv_PrintTableCfg(const Mapv_st* map)
 {
   printf("\n\n");
-  printf("\n----------------------------------------------------------------\n");
+  printf("----------------------------------------------------------------\n");
 
   printf("cfg.distSlotMax     : %"PRIuFAST32"\n", map->cfg.distSlotMax);
   printf("cfg.distBktMax      : %"PRIuFAST32"\n", map->cfg.distSlotMax);
@@ -304,13 +322,12 @@ Mapv_PrintTableCfg(const Mapv_st* map)
 
   printf("tbl.bktPtrReal      : %p\n", map->tbl.bktPtrReal);
   printf("tbl.bkt             : %p\n", map->tbl.bkt);
-  printf("\n");
+  printf("\n\n");
 
-  printf("\n----------------------------------------------------------------\n");
+  printf("----------------------------------------------------------------\n");
   printf("\n\n");
   fflush(stdout);
 }
-
 
 //------------------------------------------------------------------------------
 void
@@ -356,6 +373,23 @@ _hash(const void* key, const size_t keyLen)
 {
   return XXH3_128bits(key, keyLen);
 }
+
+
+//==============================================================================
+//
+// _hv...()
+//
+//------------------------------------------------------------------------------
+static inline bool
+_hv_is_empty(const Mapv_HV_st* hv)
+{
+  return (   hv->hash.high64 == 0
+          && hv->hash.low64  == 0
+          && hv->val         == 0);
+}
+
+
+
 
 
 //==============================================================================
@@ -502,13 +536,12 @@ _tbl_insert_hv(Mapv_st*   map,
 
   uint64_t slot = _slot_from_hash_hi(map, newHv.hash.high64);
 
-  do
-  {
+  do {
     const int newSlotDist = _slot_hash_hi_dist(map, newHv.hash.high64, slot);
 
     Mapv_HV_st curHv;
     _tbl_get_hv_from_slot(map, slot, &curHv);
-    if (curHv.hash.high64 == 0 && curHv.hash.low64 == 0 && curHv.val == 0) {
+    if (_hv_is_empty(&curHv)) {
       _tbl_set_hv_into_slot(map, slot, &newHv);
       _tbl_dist_update(map, newHv.hash.high64, slot);
       return true;
@@ -544,7 +577,7 @@ _tbl_redistribute_hashes(Mapv_st* map, Mapv_st* oldMap)
   {
     Mapv_HV_st newHv;
     _tbl_get_hv_from_slot(oldMap, oldSlot, &newHv);
-    if (newHv.hash.high64 == 0 && newHv.hash.low64 == 0 && newHv.val == 0) {
+    if (_hv_is_empty(&newHv)) {
       continue;
     }
 
@@ -646,7 +679,7 @@ Mapv_PrintTableData(const Mapv_st* map)
   {
     Mapv_HV_st hv;
     _tbl_get_hv_from_slot(map, slot, &hv);
-    if (hv.hash.high64 == 0 && hv.hash.low64 == 0 && hv.val == 0) {
+    if (_hv_is_empty(&hv)) {
       continue;
     }
 
@@ -808,8 +841,8 @@ Mapv_Find(const Mapv_st* map,
 // everything below here is for testing
 //
 //------------------------------------------------------------------------------
-// const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00000--google-10000-english.txt";
-const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00887--urls.12MM.txt";
+const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00000--google-10000-english.txt";
+// const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00887--urls.12MM.txt";
 
 //------------------------------------------------------------------------------
 char**
