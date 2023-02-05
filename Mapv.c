@@ -16,6 +16,7 @@
 #define DBG_FFL {printf("DBG: File: [%s] Func: [%s] Line: [%d]\n", \
                  __FILE__, __FUNCTION__, __LINE__);fflush(stdout);}
 
+//------------------------------------------------------------------------------
 //
 // @TODO: features/functionality
 //      - deletes
@@ -40,6 +41,7 @@
 //          - would require table sizes != power of 2
 //
 
+//------------------------------------------------------------------------------
 //
 // @DOCUMENTATION / readme
 //      - probabilistic nature of 128-bit keys and dropping original keys
@@ -55,6 +57,7 @@
 //        - this is implemented, but worth noting.
 //
 
+//------------------------------------------------------------------------------
 //
 // @NOTES: this is technically a probabilistic data structure, as the original
 //         key is not compared. this is "okay" because 128 bits of a very high
@@ -74,6 +77,7 @@
 //         to a cpu that supports avx512
 //
 
+//------------------------------------------------------------------------------
 //
 // @NOTE on SIMD for my future self:
 //
@@ -94,7 +98,7 @@
 
 //------------------------------------------------------------------------------
 //
-// initial performance:
+// performance:
 //
 //     10k short keys, 1k iterations
 //
