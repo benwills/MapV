@@ -13,7 +13,8 @@
 #include "xxhash.h"
 
 #define DBG 1
-#define DBG_FFL {printf("DBG: File: [%s] Func: [%s] Line: [%d]\n", __FILE__, __FUNCTION__, __LINE__);fflush(stdout);}
+#define DBG_FFL {printf("DBG: File: [%s] Func: [%s] Line: [%d]\n", \
+                 __FILE__, __FUNCTION__, __LINE__);fflush(stdout);}
 
 
 //
@@ -36,10 +37,20 @@
 //
 
 
-// apparently an equality comparison of certain floating point double values, even though the bits are exactly the same, does not always return true with certain vector instructions.
-// the same 10 terms, out of 10,000 in my test set, were failing on lookups, even though the data was right there.
-// that was a very long several hours. i honestly can't make sense of what was happening; whether it's a compiler/cpu bug, or if there's something i just don't understand about vector instructions (very possible).
-// anyway...the hash table is now properly resizing when hitting certain thresholds. once deletes are done, it'll be a suitable alpha.
+// apparently an equality comparison of certain floating point double values,
+// even though the bits are exactly the same, does not always return true with
+// certain vector instructions. eg: _mm256_movemask_pd()
+//
+// the same 10 terms, out of 10,000 in my test set, were failing on lookups,
+// even though the data was right there.
+//
+// that was a very long several hours. i honestly can't make sense of what was
+// happening; whether it's a compiler/cpu bug, or if there's something i just
+// don't understand about vector instructions (very possible).
+//
+// anyway...the hash table is now properly resizing when hitting certain
+// thresholds. once deletes are done, it'll be a suitable alpha.
+//
 
 
 //
