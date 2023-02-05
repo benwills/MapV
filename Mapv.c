@@ -750,16 +750,15 @@ Mapv_Find(const Mapv_st* map,
           const size_t   keyLen,
               uint64_t*  val)
 {
-  // printf("\n");
   Mapv_Hash_st  hash   = _hash(key, keyLen);
   Mapv_SlotId_t slotId = _slot_from_hash_hi(map, hash.high64);
 
   const uint64_t* pHashHi = (uint64_t*)&hash.high64;
-  const __m256i needleHi = _mm256_set_epi64x(*pHashHi,*pHashHi,
-                                             *pHashHi,*pHashHi);
+  const __m256i needleHi  = _mm256_set_epi64x(*pHashHi,*pHashHi,
+                                              *pHashHi,*pHashHi);
   const uint64_t* pHashLo = (uint64_t*)&hash.low64;
-  const __m256i needleLo = _mm256_set_epi64x(*pHashLo,*pHashLo,
-                                             *pHashLo,*pHashLo);
+  const __m256i needleLo  = _mm256_set_epi64x(*pHashLo,*pHashLo,
+                                              *pHashLo,*pHashLo);
 
   __m256i found;
   __m256i haystack;
@@ -767,8 +766,6 @@ Mapv_Find(const Mapv_st* map,
   const int maxIters = map->meta.distBktIter;
   for (int iter = 0; iter < maxIters; iter++)
   {
-    // printf(".");
-
     // `| 0x100` is to set a highest bit as an indicator that nothing was found
     // if no matches were found found, idxFoundHi/Lo will == 8.
     // could also set to 0x10 and check idxFound is 4.
@@ -808,8 +805,6 @@ Mapv_Find(const Mapv_st* map,
 //==============================================================================
 const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00000--google-10000-english.txt";
 // const char* INPUT_FILE = "/home/o/Desktop/xub-root/media/src/c/hashing/hsh.key/_in/00887--urls.12MM.txt";
-
-
 
 
 //------------------------------------------------------------------------------
@@ -853,14 +848,13 @@ file_to_str_arr(const char* fname, uint64_t* cnt)
   return arr;
 }
 
-// call this function to start a nanosecond-resolution timer
+//------------------------------------------------------------------------------
 struct timespec timer_start(){
   struct timespec start_time;
   clock_gettime(CLOCK_MONOTONIC, &start_time);
   return start_time;
 }
 
-// call this function to end a timer, returning nanoseconds elapsed as a long
 long timer_end(struct timespec start_time) {
   struct timespec end_time;
   clock_gettime(CLOCK_MONOTONIC, &end_time);
@@ -869,8 +863,6 @@ long timer_end(struct timespec start_time) {
                    + (end_time.tv_nsec - start_time.tv_nsec);
   return diffInNanos;
 }
-
-
 
 //------------------------------------------------------------------------------
 int main()
@@ -951,4 +943,3 @@ int main()
     printf("count and boolCount do not match!!!\n");
   }
 }
-
