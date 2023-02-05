@@ -36,9 +36,9 @@
 //         to a cpu that supports avx512
 //
 
-// 
+//
 // @NOTE for my future self:
-// 
+//
 // apparently an equality comparison of certain floating point double values,
 // even though the bits are exactly the same, does not always return true with
 // certain vector instructions. eg: _mm256_movemask_pd()
@@ -58,7 +58,6 @@
 //
 // 10k short keys, 1k iterations
 //     currrent fastest: https://github.com/martinus/unordered_dense
-//     https://martin.ankerl.com/2019/04/01/hashmap-benchmarks-01-overview/
 //     lookups per second : 45,724,225.09
 //     lookups per second : 45,586,745.62
 //     lookups per second : 46,176,749.84
