@@ -17,12 +17,18 @@
                  __FILE__, __FUNCTION__, __LINE__);fflush(stdout);}
 
 //
-// @TODO:
+// @TODO: features/functionality
 //      - deletes
+//      - write static table to file for sharing
 //      - configuration
 //        - hash function; allow for testing faster+lower-quality if wanted
+//        - shared memory/mmap
+//        - mmap from file
 //      - error states vs printing errors
 //      - check data types. lots of u64 used when may not be needed
+//      - implement+test likely/unlikely where applicable
+//      - test performance
+//        - generic c? c++ template?
 //      - variants
 //        - 16/32-bit data stored (eg: array ids, types, etc)
 //          - would require 2x/4x bucket size for 32-byte alignment
@@ -44,6 +50,9 @@
 //      - bucket structure = cache locality
 //        - 8 byte values stored
 //      - configuration options
+//      - distance (probe sequence length) is unsigned.
+//        - means that all compares must compare high to low to avoid branches
+//        - this is implemented, but worth noting.
 //
 
 //
@@ -83,41 +92,45 @@
 // thresholds. once deletes are done, it'll be a suitable alpha.
 //
 
-
+//------------------------------------------------------------------------------
 //
-// 10k short keys, 1k iterations
-//     currrent fastest: https://github.com/martinus/unordered_dense
-//     lookups per second : 45,724,225.09
-//     lookups per second : 45,586,745.62
-//     lookups per second : 46,176,749.84
-//     lookups per second : 45,053,718.42
-//     lookups per second : 47,111,701.40
-//     lookups per second : 43,749,540.65
-//     lookups per second : 43,614,950.53
-//     lookups per second : 46,957,599.19
-//     lookups per second : 46,584,399.40
-//     lookups per second : 48,132,160.20
-//     average: 45,869,179.03
+// initial performance:
 //
-//     MapV:
-//     lookups per second : 55,155,926.96
-//     lookups per second : 55,046,138.41
-//     lookups per second : 58,203,247.47
-//     lookups per second : 61,124,753.78
-//     lookups per second : 58,144,229.02
-//     lookups per second : 59,746,045.25
-//     lookups per second : 58,143,708.05
-//     lookups per second : 62,624,697.12
-//     lookups per second : 57,273,327.09
-//     lookups per second : 54,008,191.17
-//     average: 57,947,026.43
+//     10k short keys, 1k iterations
 //
-// 12MM urls, 10 iterations
-//     ankerl:
-//     lookups per second : 5,398,034.24
+//         https://github.com/martinus/unordered_dense
+//         lookups per second : 45,724,225.09
+//         lookups per second : 45,586,745.62
+//         lookups per second : 46,176,749.84
+//         lookups per second : 45,053,718.42
+//         lookups per second : 47,111,701.40
+//         lookups per second : 43,749,540.65
+//         lookups per second : 43,614,950.53
+//         lookups per second : 46,957,599.19
+//         lookups per second : 46,584,399.40
+//         lookups per second : 48,132,160.20
+//         average: 45,869,179.03
 //
-//     MapV:
-//     lookups per second : 8,428,561.08
+//         MapV:
+//         lookups per second : 55,155,926.96
+//         lookups per second : 55,046,138.41
+//         lookups per second : 58,203,247.47
+//         lookups per second : 61,124,753.78
+//         lookups per second : 58,144,229.02
+//         lookups per second : 59,746,045.25
+//         lookups per second : 58,143,708.05
+//         lookups per second : 62,624,697.12
+//         lookups per second : 57,273,327.09
+//         lookups per second : 54,008,191.17
+//         average: 57,947,026.43
+//
+//     12MM urls, 10 iterations
+//
+//         ankerl:
+//         lookups per second : 5,398,034.24
+//
+//         MapV:
+//         lookups per second : 8,428,561.08
 //
 
 
@@ -165,8 +178,6 @@ typedef struct Mapv_Cfg_st {
 } Mapv_Cfg_st;
 
 typedef struct Mapv_Meta_st {
-  // calculated on insert/delete
-  // to make other calculations faster
   uint64_t tblBytes;        // after "alignment"
   uint64_t tblBytesReal;    // before "alignment"
 
@@ -182,7 +193,8 @@ typedef struct Mapv_Meta_st {
 
   // distances: aka: probe sequence length
   // note that a distance of 1, is actualy two slots/buckets
-  // so our iterator needs that incremented. hence these iter values
+  // so our iterator needs that incremented.
+  // hence the pre-calculated iter values.
   uint64_t distSlotMax;
   uint64_t distSlotIter;
   uint64_t distBktMax;
@@ -401,9 +413,6 @@ _hv_is_empty(const Mapv_HV_st* hv)
 }
 
 
-
-
-
 //==============================================================================
 //
 // _bkt...()
@@ -524,13 +533,9 @@ _tbl_dist_update(Mapv_st* map, Mapv_HashHi_t hashHi, Mapv_SlotId_t slot)
 static inline bool
 _tbl_should_realloc(Mapv_st* map)
 {
-  if (map->meta.distSlotIter > map->cfg.distSlotMax) {
-    return true;
-  }
-  if (map->meta.distBktIter > map->cfg.distBktMax) {
-    return true;
-  }
-  if (map->meta.entriesCapPct > map->cfg.capPctMax) {
+  if (   map->meta.distSlotIter  > map->cfg.distSlotMax
+      || map->meta.distBktIter   > map->cfg.distBktMax
+      || map->meta.entriesCapPct > map->cfg.capPctMax) {
     return true;
   }
   return false;
@@ -950,11 +955,11 @@ int main()
   Mapv_PrintTableCfg(map);
 
   //---------------------------
-  struct timespec vartime = timer_start();
-  int sum = 0;
   int count      = 0;
+  int boolCount  = 0;
   int iterations = 10;
-  int  boolCount = 0;
+
+  struct timespec vartime = timer_start();
   for (int iter = 0; iter < iterations; ++iter)
   {
     for (uint64_t i = 0; i < valArrCnt; i++)
@@ -969,7 +974,6 @@ int main()
         // exit(1);
       } else {
         // printf("FOUND VAL: %"PRIu64"\n", val);
-        // sum += val;
         boolCount++;
       }
 
