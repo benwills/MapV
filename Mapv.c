@@ -593,7 +593,8 @@ _tbl_redistribute_hashes(Mapv_st* map, Mapv_st* oldMap)
   map->meta.distBktMax   = 0;
   map->meta.distBktIter  = 0;
 
-  for (int oldSlot = oldMap->meta.entriesCapReal; oldSlot >= 0; oldSlot--)
+  const int slotCnt = oldMap->meta.entriesCapReal;
+  for (int oldSlot = 0; oldSlot < slotCnt; oldSlot++)
   {
     Mapv_HV_st newHv;
     _tbl_get_hv_from_slot(oldMap, oldSlot, &newHv);
@@ -861,8 +862,8 @@ Mapv_Find(const Mapv_st* map,
 // everything below here is for testing
 //
 //------------------------------------------------------------------------------
-const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00000--google-10000-english.txt";
-// const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00887--urls.12MM.txt";
+// const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00000--google-10000-english.txt";
+const char* INPUT_FILE = "/media/src/c/hashing/hsh.key/_in/00887--urls.12MM.txt";
 
 //------------------------------------------------------------------------------
 char**
@@ -945,7 +946,6 @@ int main()
 
   //---------------------------
   for (uint64_t i = 0; i < valArrCnt; i++) {
-    // printf("\n> %d: ", (int)i);
     if (!Mapv_Insert(map, valArr[i], strLenArr[i], i)) {
       Mapv_PrintTableCfg(map);
       printf("Mapv_Insert failed\n");
@@ -993,7 +993,6 @@ int main()
 
   printf("boolCount : %d\n\n", boolCount);
   printf("count : %d\n\n", count);
-  printf("sum : %d\n\n", sum);
 
   if (boolCount != count) {
     printf("count and boolCount do not match!!!\n");
