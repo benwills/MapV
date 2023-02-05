@@ -70,7 +70,7 @@
 //     lookups per second : 48,132,160.20
 //     average: 45,869,179.03
 //
-//     this:
+//     MapV:
 //     lookups per second : 55,155,926.96
 //     lookups per second : 55,046,138.41
 //     lookups per second : 58,203,247.47
@@ -87,7 +87,7 @@
 //     ankerl:
 //     lookups per second : 5,398,034.24
 //
-//     this:
+//     MapV:
 //     lookups per second : 8,428,561.08
 //
 
