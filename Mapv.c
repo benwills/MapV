@@ -336,7 +336,6 @@ Mapv_PrintTableCfg(const Mapv_st* map)
 
   printf("meta.entriesCap     : %"PRIu64"\n", map->meta.entriesCap);
   printf("meta.entriesCapReal : %"PRIu64"\n", map->meta.entriesCapReal);
-
   printf("meta.entriesUsed    : %"PRIu64"\n", map->meta.entriesUsed);
   printf("meta.entriesAvail   : %"PRIu64"\n", map->meta.entriesAvail);
   printf("meta.entriesCapPct  : %f\n",        map->meta.entriesCapPct);
