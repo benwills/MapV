@@ -36,7 +36,9 @@
 //         to a cpu that supports avx512
 //
 
-
+// 
+// @NOTE for my future self:
+// 
 // apparently an equality comparison of certain floating point double values,
 // even though the bits are exactly the same, does not always return true with
 // certain vector instructions. eg: _mm256_movemask_pd()
