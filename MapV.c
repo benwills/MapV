@@ -287,8 +287,7 @@ MapV_Destroy(MapV_st* map)
 	} else {
 		return MAPV_ERR__DESTROY_MAP_IS_NULL;
 	}
-	// even though we always return true, we'll continue doing so
-	// in case future changes would actually allow returning false.
+
   return MAPV_ERR__OK;
 }
 
