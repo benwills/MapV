@@ -1,37 +1,76 @@
 
+Now that _Delete() and _Destroy() have been created,
+this is at an alpha(?) level of completion.
+
+Additional work was done for:
+ - return codes where bool was insufficient
+ - splitting into a .h and .c file
+ - splitting the test code into its own .c file
+ - initial makefile
+
+There is still some work to be done in terns of:
+ - creating tests and benchmarks
+ - improving the makefile
+ - turning it into a proper library structure
+
+But I figured I'd publish it at this stage.
+
+
+--------------------------------------------------------------------------------
+performance:
+
+    10k short keys, 1k iterations
+
+        https://github.com/martinus/unordered_dense
+        lookups per second : 45,724,225.09
+        lookups per second : 45,586,745.62
+        lookups per second : 46,176,749.84
+        lookups per second : 45,053,718.42
+        lookups per second : 47,111,701.40
+        lookups per second : 43,749,540.65
+        lookups per second : 43,614,950.53
+        lookups per second : 46,957,599.19
+        lookups per second : 46,584,399.40
+        lookups per second : 48,132,160.20
+        average: 45,869,179.03
+
+        MapV:
+        lookups per second : 55,155,926.96
+        lookups per second : 55,046,138.41
+        lookups per second : 58,203,247.47
+        lookups per second : 61,124,753.78
+        lookups per second : 58,144,229.02
+        lookups per second : 59,746,045.25
+        lookups per second : 58,143,708.05
+        lookups per second : 62,624,697.12
+        lookups per second : 57,273,327.09
+        lookups per second : 54,008,191.17
+        average: 57,947,026.43
+
+    12MM urls, 10 iterations
+
+        ankerl:
+        lookups per second : 5,398,034.24
+
+        MapV:
+        lookups per second : 8,428,561.08
+
+
 --------------------------------------------------------------------------------
 @Requirements
+
   - CPU supporting AVX2
+  - XXHash3
 
 
 --------------------------------------------------------------------------------
 @TODO: features/functionality
 
-	- delete
-	- destroy: test
-	- makefile
 	- cli testing, passing in a file for keys
-	- write static table to file for sharing
-	- configuration
-	  - hash function; allow for testing faster+lower-quality if wanted
-	  - shared memory/mmap
-	  - mmap from file
-	- error states vs false in certain situations
-		- create, destroy, delete
 	- check data types. lots of u64 used when may not be needed
-	- implement+test likely/unlikely where applicable
 	- test performance
 	  - check for empty slots on lookup; allow to return faster on no key
 	  - generic c? c++ template?
-	- variants
-	  - 16/32-bit data stored (eg: array ids, types, etc)
-	    - would require 2x/4x bucket size for 32-byte alignment
-	  - 64-bit: save keys and compare vs 128-bit probabilistic
-	  - avx512
-	    - 256-bit hashes?
-	  - static tables
-	    - post-hash optimizer for compaction
-	    - would require table sizes != power of 2
 
 
 --------------------------------------------------------------------------------
@@ -97,43 +136,16 @@
 
 
 --------------------------------------------------------------------------------
-performance:
+@FUTURE: i'm on the fence about these, but leaving the notes
 
-    10k short keys, 1k iterations
-
-        https://github.com/martinus/unordered_dense
-        lookups per second : 45,724,225.09
-        lookups per second : 45,586,745.62
-        lookups per second : 46,176,749.84
-        lookups per second : 45,053,718.42
-        lookups per second : 47,111,701.40
-        lookups per second : 43,749,540.65
-        lookups per second : 43,614,950.53
-        lookups per second : 46,957,599.19
-        lookups per second : 46,584,399.40
-        lookups per second : 48,132,160.20
-        average: 45,869,179.03
-
-        MapV:
-        lookups per second : 55,155,926.96
-        lookups per second : 55,046,138.41
-        lookups per second : 58,203,247.47
-        lookups per second : 61,124,753.78
-        lookups per second : 58,144,229.02
-        lookups per second : 59,746,045.25
-        lookups per second : 58,143,708.05
-        lookups per second : 62,624,697.12
-        lookups per second : 57,273,327.09
-        lookups per second : 54,008,191.17
-        average: 57,947,026.43
-
-    12MM urls, 10 iterations
-
-        ankerl:
-        lookups per second : 5,398,034.24
-
-        MapV:
-        lookups per second : 8,428,561.08
-
+	- variants
+	  - 16/32-bit data stored (eg: array ids, types, etc)
+	    - would require 2x/4x bucket size for 32-byte alignment
+	  - 64-bit: save keys and compare vs 128-bit probabilistic
+	  - avx512
+	    - 256-bit hashes?
+	  - static tables
+	    - post-hash optimizer for compaction
+	    - would require table sizes != power of 2
 
 
