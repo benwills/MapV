@@ -66,8 +66,10 @@ performance:
 --------------------------------------------------------------------------------
 @TODO: features/functionality
 
+	- creating tests and benchmarks
+	- improving the makefile
+	- turning it into a proper library structure
 	- cli testing, passing in a file for keys
-	- check data types. lots of u64 used when may not be needed
 	- test performance
 	  - check for empty slots on lookup; allow to return faster on no key
 	  - generic c? c++ template?
