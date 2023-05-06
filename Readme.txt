@@ -1,8 +1,14 @@
 
 --------------------------------------------------------------------------------
-`git clone https://github.com/benwills/MapV`
-`cd MapV`
-`make clean && make && make test`
+git clone https://github.com/benwills/MapV && cd MapV && make clean && make && make test
+
+or, step by step:
+
+git clone https://github.com/benwills/MapV
+cd MapV
+make clean
+make
+make test
 
 
 --------------------------------------------------------------------------------
