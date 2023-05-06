@@ -18,10 +18,10 @@ MapV_testObjArr: MapV_testObjArr.o
 	$(CC) -o $@ MapV_testObjArr.o $(CFLAGS)
 
 test:
-	./MapV_test ./test/input.stop_words.536.txt
-	./MapV_test ./test/input.ips_sort_of.3901.txt
-	./MapV_test ./test/input.english_words.10k.txt
-	./MapV_test ./test/input.alexa_domains.1M.txt
+	./MapV_test ./input.stop_words.536.txt
+	./MapV_test ./input.ips_sort_of.3901.txt
+	./MapV_test ./input.english_words.10k.txt
+	./MapV_test ./input.alexa_domains.1M.txt
 	./MapV_testObjArr
 
 clean:
