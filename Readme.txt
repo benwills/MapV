@@ -1,4 +1,11 @@
 
+--------------------------------------------------------------------------------
+`git clone https://github.com/benwills/MapV`
+`cd MapV`
+`make clean && make && make test`
+
+
+--------------------------------------------------------------------------------
 Now that _Delete() and _Destroy() have been created,
 this is at an alpha(?) level of completion.
 
@@ -70,9 +77,33 @@ performance:
 	- improving the makefile
 	- turning it into a proper library structure
 	- cli testing, passing in a file for keys
+	- ability to set size of value different from 8 bytes
+	- store original key for exact lookup, removing probabilistic nature
+		- if all keys are 8/16/etc,bytes or less, store in the same memory segment
+		  - else, store offset and len in 8 bytes; 48 + 16 (== 64k max key len)
+		- also consider 64 bit hash at that point
+		  - also consider still generating 128 bit, but using the other 8bytes for slot id
+		    - would require rehashing on resize
+			- would have to continue searching in case of hash collision
+			  - hopefully resolved by using other 128-bit hash for slot id
 	- test performance
 	  - check for empty slots on lookup; allow to return faster on no key
 	  - generic c? c++ template?
+
+
+--------------------------------------------------------------------------------
+@TODO: variations
+
+	- MapVP: Persist to disk
+	- MapVS: Static/Unmodifiable after initial inserts
+	- MapVC: Compact+Static;
+	  - alter hash (while maintaining integrity) to find smallest table size
+	  - may have slightly slower lookups, due to:
+	    - given non-power of two table size
+	    - maximizing probe sequence length (though this can also be tuned)
+	  - small sets may have faster lookups depending on if they fit in cpu cache
+	  - allow to specify if all keys have the same len
+	    - this allows xxhash optimization on smaller keys to run up to 2x as fast
 
 
 --------------------------------------------------------------------------------
@@ -80,7 +111,7 @@ performance:
 
 	- probabilistic nature of 128-bit keys and dropping original keys
 	  - benefits : memory access
-	  - downsides: possible faslse positives
+	  - downsides: possible false positives
 	- slotId shift from top of hash means rebuilding table maintains order
 	  - ie: early-loaded keys are found faster, regardless of rebuilds
 	- bucket structure = cache locality
