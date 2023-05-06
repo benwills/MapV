@@ -47,42 +47,49 @@ typedef enum MapV_Err_et
 } MapV_Err_et;
 
 
-
-
 //------------------------------------------------------------------------------
 typedef XXH128_hash_t MapV_Hash_st;
 typedef uint64_t      MapV_HashHi_t;
 typedef uint64_t      MapV_HashLo_t;
-typedef uint64_t      MapV_Val_t;
 typedef uint64_t      MapV_SlotId_t;
 typedef uint64_t      MapV_BktId_t;
-typedef uint64_t      MapV_Dist_t; // distance. NOTE: unsigned. check compares
+typedef uint64_t      MapV_Dist_t; // distance / PSL (probe sequence length)
+                                   // NOTE: careful; unsigned.
+typedef union         MapV_Val_ut {
+	uint64_t    u64;
+	const void* ptr;
+} MapV_Val_ut;
 
+
+//------------------------------------------------------------------------------
 // used internally: "hv" = "hash and val," where val is the 8 byte ptr/data
 typedef struct MapV_HV_st {
   MapV_Hash_st hash;
-  MapV_Val_t   val;
+  MapV_Val_ut  val;
 } MapV_HV_st;
 
 typedef struct MapV_Bkt_st {
   MapV_HashHi_t slotsHi[MAPV_BKT_SLOTS];
   MapV_HashLo_t slotsLo[MAPV_BKT_SLOTS];
-  MapV_Val_t    vals   [MAPV_BKT_SLOTS];
+  MapV_Val_ut   vals   [MAPV_BKT_SLOTS];
 } MapV_Bkt_st;
 
 typedef struct MapV_Cfg_st {
-  MapV_Dist_t distSlotMax; // when we pass this, increase table sise
-  MapV_Dist_t distBktMax;  // when we pass this, increase table sise
-  double      capPctMax;   // when we pass this, increase table sise
-  int         memAlign;    // must be multuple of 32
+  MapV_Dist_t distSlotMax;      // max slot probe distance before resize
+  MapV_Dist_t distBktMax;       // max bucket probe distance before resize
+  double      capPctMax;        // max capacity percentage before resize
+  int         memAlign;         // hash table memory alignment. multiple of 32
+  uint64_t    initialSlotCount; // if you know how many entries you have,
+                                // set it here, with extra, to avoid reallocing
+                                // and rebuilding the table as it grows.
 } MapV_Cfg_st;
 
 typedef struct MapV_Meta_st {
-  uint64_t tblBytes;        // after "alignment"
-  uint64_t tblBytesReal;    // before "alignment"
+  uint64_t tblBytes;      // after "alignment"
+  uint64_t tblBytesReal;  // before "alignment"
 
-  uint64_t bktsCnt;         // buckets have 4 slots for entries
-  uint64_t bktsCntReal;     // buckets have 4 slots for entries
+  uint64_t bktsCnt;       // buckets have 4 slots for entries
+  uint64_t bktsCntReal;   // buckets have 4 slots for entries
 
   uint64_t slotHashShift; // pre-calc; for finding our bucket index
   uint64_t slotsCap;      // number of slots in the table
@@ -106,10 +113,15 @@ typedef struct MapV_Tbl_st {
   MapV_Bkt_st* bkt;
 } MapV_Tbl_st;
 
+typedef struct MapV_Stats_st {
+	uint64_t mm256Loads;
+} MapV_Stats_st;
+
 typedef struct MapV_st {
-  MapV_Cfg_st  cfg;
-  MapV_Meta_st meta;
-  MapV_Tbl_st  tbl;
+  MapV_Cfg_st   cfg;
+  MapV_Meta_st  meta;
+  MapV_Tbl_st   tbl;
+  MapV_Stats_st stats;
 } MapV_st;
 
 
@@ -117,24 +129,20 @@ typedef struct MapV_st {
 
 //------------------------------------------------------------------------------
 MapV_st*
-MapV_Create(const MapV_Dist_t distSlotMax,
-            const MapV_Dist_t distBktMax,
-            const double      capPctMax,
-            const int         memAlign,
-            const uint64_t    initialEntryCount);
+MapV_Create(const MapV_Cfg_st* cfg);
 
 MapV_Err_et
-MapV_Insert(      MapV_st*   map,
-            const void*      key,
-            const size_t     keyLen,
-            const MapV_Val_t val,
-            const bool       overwriteIfExists);
+MapV_Insert(      MapV_st*    map,
+            const void*       key,
+            const size_t      keyLen,
+            const MapV_Val_ut val,
+            const bool        overwriteIfExists);
 
 bool
-MapV_Find(const MapV_st*  map,
-          const void*     key,
-          const size_t    keyLen,
-                uint64_t* val);
+MapV_Find(      MapV_st*     map,
+          const void*        key,
+          const size_t       keyLen,
+                MapV_Val_ut* val);
 
 MapV_Err_et
 MapV_Delete(      MapV_st* map,

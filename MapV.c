@@ -20,9 +20,10 @@
 
 
 
+
 //------------------------------------------------------------------------------
 //
-// static function headers
+// static function declarations
 //
 
 // only used for debugging:
@@ -114,26 +115,23 @@ _tbl_realloc_grow(MapV_st* cur);
 
 //------------------------------------------------------------------------------
 MapV_st*
-MapV_Create(const MapV_Dist_t distSlotMax,
-            const MapV_Dist_t distBktMax,
-            const double      capPctMax,
-            const int         memAlign,
-            const uint64_t    initialSlotCount)
+MapV_Create(const MapV_Cfg_st* cfg)
 {
-  if (memAlign % 32 != 0) {
+  if (cfg->memAlign % 32 != 0) {
     printf("alignment must be a multiple of 32 bytes. (4096 recommended)\n");
-    printf("attempted to configure with %d bytes\n", memAlign);
+    printf("attempted to configure with %d bytes\n", cfg->memAlign);
     return NULL;
   }
 
   MapV_st* map = calloc(1, sizeof(*map));
 
-  map->cfg.distSlotMax = distSlotMax;
-  map->cfg.distBktMax  = distBktMax;
-  map->cfg.capPctMax   = capPctMax;
-  map->cfg.memAlign    = memAlign;
-
-  map->meta.slotsCap   = initialSlotCount;
+  map->cfg.distSlotMax   = cfg->distSlotMax;
+  map->cfg.distBktMax    = cfg->distBktMax;
+  map->cfg.capPctMax     = cfg->capPctMax;
+  map->cfg.memAlign      = cfg->memAlign;
+  map->meta.slotsCap     = cfg->initialSlotCount;
+  map->meta.distSlotIter = 1;
+  map->meta.distBktIter  = 1;
 
   if (!_tbl_realloc_grow(map)) {
     free(map);
@@ -147,11 +145,11 @@ MapV_Create(const MapV_Dist_t distSlotMax,
 
 //------------------------------------------------------------------------------
 MapV_Err_et
-MapV_Insert(      MapV_st*   map,
-            const void*      key,
-            const size_t     keyLen,
-            const MapV_Val_t val,
-            const bool       overwriteIfExists)
+MapV_Insert(      MapV_st*    map,
+            const void*       key,
+            const size_t      keyLen,
+            const MapV_Val_ut val,
+            const bool        overwriteIfExists)
 {
   MapV_HV_st newHv = { .hash = _hash(key, keyLen), .val = val, };
 
@@ -184,20 +182,15 @@ MapV_Insert(      MapV_st*   map,
 //        instructions when translating the slot id into bkt+bktslot again.
 //        we want find() to be fast, so we keep it all right here.
 bool
-MapV_Find(const MapV_st*  map,
-          const void*     key,
-          const size_t    keyLen,
-                uint64_t* val)
+MapV_Find(      MapV_st*     map,
+          const void*        key,
+          const size_t       keyLen,
+                MapV_Val_ut* val)
 {
   const MapV_Hash_st  hash     = _hash(key, keyLen);
         MapV_SlotId_t slotId   = _slot_from_hash_hi(map, hash.high64);
-
-  const uint64_t*     pHashHi  = (uint64_t*)&hash.high64;
-  const __m256i       needleHi = _mm256_set_epi64x(*pHashHi, *pHashHi,
-                                                   *pHashHi, *pHashHi);
-  const uint64_t*     pHashLo  = (uint64_t*)&hash.low64;
-  const __m256i       needleLo = _mm256_set_epi64x(*pHashLo, *pHashLo,
-                                                   *pHashLo, *pHashLo);
+  const __m256i       needleHi = _mm256_set1_epi64x(hash.high64);
+  const __m256i       needleLo = _mm256_set1_epi64x(hash.low64);
 
   __m256i found;
   __m256i haystack;
@@ -213,19 +206,23 @@ MapV_Find(const MapV_st*  map,
 
     const MapV_BktId_t bktId = slotId / MAPV_BKT_SLOTS;
 
+  	map->stats.mm256Loads++;
     haystack = _mm256_load_si256((__m256i*)map->tbl.bkt[bktId].slotsHi);
     found    = _mm256_cmpeq_epi64(haystack, needleHi);
     const int idxHi = __builtin_ctz(_mm256_movemask_pd((__m256d)found) | 0x100);
+
+    // somehow runs about the same speed with vs without this branch
     if (idxHi == 8) { // not found
       slotId += MAPV_BKT_SLOTS;
       continue;
     }
 
+  	map->stats.mm256Loads++;
     haystack = _mm256_load_si256((__m256i*)map->tbl.bkt[bktId].slotsLo);
     found    = _mm256_cmpeq_epi64(haystack, needleLo);
     const int idxLo = __builtin_ctz(_mm256_movemask_pd((__m256d)found) | 0x100);
     if (idxHi == idxLo) { // found
-      *val = map->tbl.bkt[bktId].vals[idxLo];
+      val->u64 = map->tbl.bkt[bktId].vals[idxLo].u64;
       return true;
     }
 
@@ -236,6 +233,7 @@ MapV_Find(const MapV_st*  map,
 }
 
 //------------------------------------------------------------------------------
+// @TODO: there may be a better way to implement this...?
 MapV_Err_et
 MapV_Delete(      MapV_st* map,
             const void*    key,
@@ -250,23 +248,27 @@ MapV_Delete(      MapV_st* map,
 	MapV_Dist_t   dist   = _slot_hash_hi_dist(map, hashHi, curSlotId);
 	_tbl_clear_slot(map, curSlotId);
 
-	while (dist > 0)
+	do
 	{
-		MapV_SlotId_t nextSlotId = curSlotId + 1;
+		const MapV_SlotId_t nextSlotId = curSlotId + 1;
 
 		MapV_HV_st nextSlotHv;
 		_tbl_get_hv_from_slot(map, nextSlotId, &nextSlotHv);
 		if (_hv_is_empty(&nextSlotHv)) {
-			return MAPV_ERR__OK;
+			break;
 		}
 
 		_tbl_clear_slot(map, nextSlotId);
 
+		dist = _slot_hash_hi_dist(map, nextSlotHv.hash.high64, nextSlotId);
+		if (dist == 0) {
+			break;
+		}
 		_tbl_set_hv_into_slot(map, curSlotId, &nextSlotHv);
-		dist = _slot_hash_hi_dist(map, nextSlotHv.hash.high64, curSlotId);
 
 		curSlotId++;
-	}
+
+	} while (dist > 0);
 
   return MAPV_ERR__OK;
 }
@@ -305,23 +307,19 @@ void
 MapV_PrintTableCfg(const MapV_st* map)
 {
   printf("\n\n");
-  printf("----------------------------------------------------------------\n");
+  printf("--------------------------------\n");
   printf("\n");
-
   printf("cfg.distSlotMax    : %"PRIu64"\n", map->cfg.distSlotMax);
   printf("cfg.distBktMax     : %"PRIu64"\n", map->cfg.distSlotMax);
   printf("cfg.capPctMax      : %f\n",        map->cfg.capPctMax);
   printf("cfg.memAlign       : %d\n",        map->cfg.memAlign);
   printf("\n");
-
   printf("meta.tblBytes      : %"PRIu64"\n", map->meta.tblBytes);
   printf("meta.tblBytesReal  : %"PRIu64"\n", map->meta.tblBytesReal);
   printf("\n");
-
   printf("meta.bktsCnt       : %"PRIu64"\n", map->meta.bktsCnt);
   printf("meta.bktsCntReal   : %"PRIu64"\n", map->meta.bktsCntReal);
   printf("\n");
-
   printf("meta.slotHashShift : %"PRIu64"\n", map->meta.slotHashShift);
   printf("meta.slotsCap      : %"PRIu64"\n", map->meta.slotsCap);
   printf("meta.slotsCapReal  : %"PRIu64"\n", map->meta.slotsCapReal);
@@ -329,18 +327,17 @@ MapV_PrintTableCfg(const MapV_st* map)
   printf("meta.slotsAvail    : %"PRIu64"\n", map->meta.slotsAvail);
   printf("meta.slotsCapPct   : %f\n",        map->meta.slotsCapPct);
   printf("\n");
-
   printf("meta.distSlotMax   : %"PRIu64"\n", map->meta.distSlotMax);
   printf("meta.distSlotIter  : %"PRIu64"\n", map->meta.distSlotIter);
   printf("meta.distBktMax    : %"PRIu64"\n", map->meta.distBktMax);
   printf("meta.distBktIter   : %"PRIu64"\n", map->meta.distBktIter);
   printf("\n");
-
   printf("tbl.bktPtrReal     : %p\n", map->tbl.bktPtrReal);
   printf("tbl.bkt            : %p\n", map->tbl.bkt);
+  printf("\n");
+  printf("stats.mm256Loads   : %"PRIu64"\n", map->stats.mm256Loads);
   printf("\n\n");
-
-  printf("----------------------------------------------------------------\n");
+  printf("--------------------------------\n");
   printf("\n\n");
   fflush(stdout);
 }
@@ -364,7 +361,7 @@ MapV_PrintTableData(const MapV_st* map)
     numFound++;
     const int slotDist = _slot_hash_hi_dist(map, hv.hash.high64, slotId);
     printf("\t[%d] %"PRIu64" %"PRIu64" : %"PRIu64" : %d\n",
-           slotId, hv.hash.high64, hv.hash.low64, hv.val, slotDist);
+           slotId, hv.hash.high64, hv.hash.low64, hv.val.u64, slotDist);
     fflush(stdout);
 
     if (slotDist > distSlotMax) {
@@ -476,9 +473,7 @@ _hashhi_from_slot(const MapV_st*      map,
 static inline bool
 _hashes_are_equal(const MapV_Hash_st hash1, const MapV_Hash_st hash2)
 {
-	// @TODO: XORing and checking == 0 may be faster
-  return (   hash1.high64 == hash2.high64
-          && hash1.low64  == hash2.low64);
+  return (0 == ((hash1.high64 ^ hash2.high64) | (hash1.low64 ^ hash2.low64)));
 }
 
 
@@ -490,10 +485,7 @@ _hashes_are_equal(const MapV_Hash_st hash1, const MapV_Hash_st hash2)
 static inline bool
 _hv_is_empty(const MapV_HV_st* hv)
 {
-	// @TODO: ORing fields and checking == 0 may be faster
-  return (   hv->hash.high64 == 0
-          && hv->hash.low64  == 0
-          && hv->val         == 0);
+  return (0 == (hv->hash.high64 | hv->hash.low64 | hv->val.u64));
 }
 
 
@@ -550,6 +542,8 @@ _slot_from_key(const MapV_st* map,
 {
   const MapV_Hash_st  hash     = _hash(key, keyLen);
         MapV_SlotId_t slotId   = _slot_from_hash_hi(map, hash.high64);
+
+// #ifdef __AVX2__ ... __AVX__
 
   const uint64_t*     pHashHi  = (uint64_t*)&hash.high64;
   const __m256i       needleHi = _mm256_set_epi64x(*pHashHi, *pHashHi,
@@ -620,9 +614,9 @@ _tbl_clear_slot(const MapV_st*      map,
 {
   const MapV_BktId_t bktId     = _bkt_from_slot(slotId);
   const MapV_BktId_t bktSlotId = _bktslot_from_slot(slotId);
-  map->tbl.bkt[bktId].slotsHi[bktSlotId] = 0;
-  map->tbl.bkt[bktId].slotsLo[bktSlotId] = 0;
-  map->tbl.bkt[bktId].vals   [bktSlotId] = 0;
+  map->tbl.bkt[bktId].slotsHi[bktSlotId]     = 0;
+  map->tbl.bkt[bktId].slotsLo[bktSlotId]     = 0;
+  map->tbl.bkt[bktId].vals   [bktSlotId].u64 = 0;
 }
 
 //------------------------------------------------------------------------------

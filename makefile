@@ -1,21 +1,30 @@
+CC     := gcc
 SRCS   := MapV.c
-OBJS   := mapv.o
-CFLAGS := -O3 -lm -Wall -march=native -mavx -mavx2 -march=native -lxxhash
+OBJS   := MapV.o
+CFLAGS := -O3 -lm -Wall -mavx -mavx2 -march=native -lxxhash -I/usr/local/include -L/usr/local/lib -lxxhash
 
 # ALL TARGET
 
-.PHONY: all clean
-all: mapv.o MapV_test
+.PHONY: all clean test
+all: MapV_test MapV_testObjArr
 
-mapv.o: MapV.c
-	$(CC) -c -o $@ $^ $(CFLAGS)
+%.o: %.c
+	$(CC) -c -o $@ $< $(CFLAGS)
 
-MapV_test.o: MapV_test.c
-	$(CC) -c -o $@ $^ $(CFLAGS)
+MapV_test: MapV_test.o
+	$(CC) -o $@ MapV_test.o $(CFLAGS)
 
-MapV_test: MapV_test.o mapv.o
-	$(CC) -o $@ MapV_test.o mapv.o $(CFLAGS)
+MapV_testObjArr: MapV_testObjArr.o
+	$(CC) -o $@ MapV_testObjArr.o $(CFLAGS)
+
+test:
+	./MapV_test ./test/input.stop_words.536.txt
+	./MapV_test ./test/input.ips_sort_of.3901.txt
+	./MapV_test ./test/input.english_words.10k.txt
+	./MapV_test ./test/input.alexa_domains.1M.txt
+	./MapV_testObjArr
 
 clean:
 	rm -rf *.o
-	rm MapV_test
+	rm MapV_test       || true
+	rm MapV_testObjArr || true
